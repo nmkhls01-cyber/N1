@@ -40,26 +40,53 @@ def check_tweets():
     seen = load_seen()
     new_seen = set(seen)
     
-    # استخدام واجهة بديلة وخفيفة جداً لفتح الحسابات وجلب آخر التغريدات
+    # استخدام عدة سيرفرات Nitter بديلة وموزعة لضمان عدم الحظر
+    nitter_instances = [
+        "https://nitter.privacydev.net",
+        "https://nitter.lucabased.ch",
+        "https://nitter.catsarch.com"
+    ]
+    
     for account in ACCOUNTS:
-        url = f"https://r.jina.ai/https://x.com/{account}"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        try:
-            response = requests.get(url, headers=headers, timeout=20)
-            if response.status_code != 200:
+        success = False
+        for instance in nitter_instances:
+            url = f"{instance}/{account}/rss"
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+            try:
+                response = requests.get(url, headers=headers, timeout=10)
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.text, "xml")
+                    items = soup.find_all("item")
+                    
+                    if items:
+                        # فحص آخر 3 تغريدات
+                        for item in items[:3]:
+                            link = item.find("link")
+                            title = item.find("title")
+                            
+                            if not link:
+                                continue
+                            
+                            tweet_link = link.text
+                            tweet_id = tweet_link.split("/")[-1]
+                            
+                            if tweet_id in seen:
+                                continue
+                            
+                            tweet_title = title.text if title else "تغريدة جديدة"
+                            
+                            message = f"🚨 <b>تغريدة جديدة من @{account}</b>\n\n{tweet_title}\n\n🔗 <a href='{tweet_link}'>رابط التغريدة</a>"
+                            
+                            send_telegram(message)
+                            new_seen.add(tweet_id)
+                        
+                        success = True
+                        break
+            except Exception:
                 continue
-                
-            content = response.text
-            # إذا وصلنا محتوى الصفحة بنجاح، نرسل إشعار بأنه تم الفحص وأن الحساب نشط
-            # ونستخرج أجزاء من النص إذا وجدت
-            if account not in seen and len(content) > 100:
-                message = f"🚨 <b>تم رصد تحديث أو نشاط من الحساب: @{account}</b>\n\n🔗 <a href='https://x.com/{account}'>رابط الحساب على X</a>"
-                # نرسل الإشعار مرة واحدة للتأكد من عمل البوت وتجاوز مشكلة الـ Nitter
-                send_telegram(message)
-                new_seen.add(account)
-                
-        except Exception as e:
-            print(f"Error {account}: {e}")
+        
+        if not success:
+            print(f"Could not fetch for {account}")
             
     save_seen(new_seen)
 
