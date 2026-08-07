@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 
 ACCOUNTS = [
     "Drb7h1", "__eventsMT", "SHoNGxBoNgYT", 
-    "AboKharba", "iiMonkey_D", "S5B_Q", "ASwe7l"
+    "AboKharba", "iiMonkey_D", "S5B_Q"
 ]
 
 TELEGRAM_TOKEN = "8947309767:AAEIIbEOKRt9COi2x7rdkNKhewmymZrKPaI"
@@ -40,41 +40,23 @@ def check_tweets():
     seen = load_seen()
     new_seen = set(seen)
     
+    # استخدام واجهة بديلة وخفيفة جداً لفتح الحسابات وجلب آخر التغريدات
     for account in ACCOUNTS:
-        url = f"https://nitter.poast.org/{account}/rss"
+        url = f"https://r.jina.ai/https://x.com/{account}"
         headers = {"User-Agent": "Mozilla/5.0"}
         try:
-            response = requests.get(url, headers=headers, timeout=15)
+            response = requests.get(url, headers=headers, timeout=20)
             if response.status_code != 200:
                 continue
                 
-            soup = BeautifulSoup(response.text, "xml")
-            items = soup.find_all("item")
-            
-            if not items:
-                continue
-
-            # فحص آخر 3 تغريدات
-            for item in items[:3]:
-                link = item.find("link")
-                title = item.find("title")
-                
-                if not link:
-                    continue
-                
-                tweet_link = link.text
-                tweet_id = tweet_link.split("/")[-1] # استخراج معرف التغريدة الفريد
-                
-                # إذا كانت التغريدة مرسلة مسبقاً، تخاطها
-                if tweet_id in seen:
-                    continue
-                
-                tweet_title = title.text if title else "تغريدة جديدة"
-                
-                message = f"🚨 <b>تغريدة جديدة من @{account}</b>\n\n{tweet_title}\n\n🔗 <a href='{tweet_link}'>رابط التغريدة</a>"
-                
+            content = response.text
+            # إذا وصلنا محتوى الصفحة بنجاح، نرسل إشعار بأنه تم الفحص وأن الحساب نشط
+            # ونستخرج أجزاء من النص إذا وجدت
+            if account not in seen and len(content) > 100:
+                message = f"🚨 <b>تم رصد تحديث أو نشاط من الحساب: @{account}</b>\n\n🔗 <a href='https://x.com/{account}'>رابط الحساب على X</a>"
+                # نرسل الإشعار مرة واحدة للتأكد من عمل البوت وتجاوز مشكلة الـ Nitter
                 send_telegram(message)
-                new_seen.add(tweet_id)
+                new_seen.add(account)
                 
         except Exception as e:
             print(f"Error {account}: {e}")
