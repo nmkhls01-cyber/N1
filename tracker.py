@@ -1,6 +1,7 @@
 import os
 import requests
 import feedparser
+from bs4 import BeautifulSoup
 
 TELEGRAM_TOKEN = "8947309767:AAEIIbEOKRt9COi2x7rdkNKhewmymZrKPaI"
 CHAT_ID = "8925137681"
@@ -33,7 +34,7 @@ def save_seen(seen):
 
 def send_telegram(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "HTML"}
+    payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "HTML", "disable_web_page_preview": False}
     requests.post(url, json=payload, timeout=10)
 
 def check_tweets():
@@ -45,7 +46,11 @@ def check_tweets():
             feed = feedparser.parse(feed_url)
             for entry in feed.entries[:3]:
                 if entry.id not in seen:
-                    message = f"🚨 <b>تغريدة جديدة!</b>\n\n{entry.title}\n\n🔗 <a href='{entry.link}'>رابط التغريدة</a>"
+                    # تنظيف محتوى التغريدة من وسوم الـ HTML الزائدة لعرض النص بوضوح
+                    soup = BeautifulSoup(entry.summary, "html.parser")
+                    clean_text = soup.get_text()
+                    
+                    message = f"💬 <b>تغريدة جديدة:</b>\n\n{clean_text}\n\n🔗 <a href='{entry.link}'>رابط التغريدة الأصلي</a>"
                     send_telegram(message)
                     new_seen.add(entry.id)
         except Exception as e:
