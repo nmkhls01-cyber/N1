@@ -32,16 +32,6 @@ def save_seen(seen):
         for tweet_id in seen:
             f.write(f"{tweet_id}\n")
 
-def send_telegram_media(caption, photo_url):
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
-    payload = {
-        "chat_id": CHAT_ID,
-        "photo": photo_url,
-        "caption": caption,
-        "parse_mode": "HTML"
-    }
-    requests.post(url, json=payload)
-
 def check_tweets():
     seen = load_seen()
     new_seen = set(seen)
@@ -52,19 +42,32 @@ def check_tweets():
             for entry in feed.entries[:3]:
                 if entry.id not in seen:
                     soup = BeautifulSoup(entry.summary, "html.parser")
-                    # جلب النص
                     text = soup.get_text()
-                    # محاولة العثور على صورة حقيقية داخل التغريدة
-                    img = soup.find("img")
-                    img_url = img["src"] if img else None
                     
-                    message = f"🔥 <b>تغريدة جديدة!</b>\n\n{text}\n\n🔗 <a href='{entry.link}'>اضغط هنا للمشاهدة</a>"
+                    # البحث عن صورة أو فيديو داخل محتوى التغريدة
+                    img_tag = soup.find("img")
+                    video_tag = soup.find("video") or soup.find("source")
                     
-                    if img_url:
-                        send_telegram_media(message, img_url)
+                    message = f"🚨 <b>تغريدة جديدة!</b>\n\n{text}\n\n🔗 <a href='{entry.link}'>رابط التغريدة</a>"
+                    
+                    if img_tag and img_tag.get("src"):
+                        # إرسالها كصورة حقيقية يمكن تحميلها
+                        requests.post(
+                            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto",
+                            json={"chat_id": CHAT_ID, "photo": img_tag["src"], "caption": message, "parse_mode": "HTML"}
+                        )
+                    elif video_tag and video_tag.get("src"):
+                        # إرسالها كفيديو حقيقي يمكن تحميله
+                        requests.post(
+                            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendVideo",
+                            json={"chat_id": CHAT_ID, "video": video_tag["src"], "caption": message, "parse_mode": "HTML"}
+                        )
                     else:
-                        requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", 
-                                      json={"chat_id": CHAT_ID, "text": message, "parse_mode": "HTML"})
+                        # إذا لم تكن تحتوي على ميديا، ترسل كنص عادي بدون معاينة
+                        requests.post(
+                            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                            json={"chat_id": CHAT_ID, "text": message, "parse_mode": "HTML", "disable_web_page_preview": True}
+                        )
                     
                     new_seen.add(entry.id)
         except Exception as e:
