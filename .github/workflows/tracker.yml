@@ -31,3 +31,4 @@ jobs:
         with:
           commit_message: "Update seen tweets automatically"
           file_pattern: seen_tweets.txt
+
