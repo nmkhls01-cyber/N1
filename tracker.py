@@ -32,7 +32,22 @@ def save_seen(seen):
         for tweet_id in seen:
             f.write(f"{tweet_id}\n")
 
-def send_telegram(message):
+def send_telegram_media(caption, photo_url, link):
+    # إرسال التغريدة مع صورة في حال توفرت صورة مرفقة
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
+    payload = {
+        "chat_id": CHAT_ID,
+        "photo": photo_url,
+        "caption": caption,
+        "parse_mode": "HTML"
+    }
+    response = requests.post(url, json=payload, timeout=10)
+    
+    # إذا فشل إرسال الصورة لسبب ما، يرسلها كنص عادي مع الرابط لضمان عدم ضياع التغريدة
+    if response.status_code != 200:
+        send_telegram_text(caption)
+
+def send_telegram_text(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "HTML", "disable_web_page_preview": False}
     requests.post(url, json=payload, timeout=10)
@@ -44,14 +59,29 @@ def check_tweets():
     for feed_url in RSS_FEEDS:
         try:
             feed = feedparser.parse(feed_url)
+            # استخراج اسم الحساب من عنوان الـ RSS العام
+            account_name = feed.feed.get.get("title", "تويتر") if hasattr(feed, 'feed') else "تويتر"
+            
             for entry in feed.entries[:3]:
                 if entry.id not in seen:
-                    # تنظيف محتوى التغريدة من وسوم الـ HTML الزائدة لعرض النص بوضوح
+                    # تنظيف النص
                     soup = BeautifulSoup(entry.summary, "html.parser")
                     clean_text = soup.get_text()
                     
-                    message = f"💬 <b>تغريدة جديدة:</b>\n\n{clean_text}\n\n🔗 <a href='{entry.link}'>رابط التغريدة الأصلي</a>"
-                    send_telegram(message)
+                    # محاولة البحث عن صورة مرفقة داخل التغريدة
+                    img_tag = soup.find("img")
+                    img_url = img_tag["src"] if img_tag and "src" in img_tag.attrs else None
+                    
+                    # محاولة استخراج اسم صاحب الحساب من عنوان التغريدة إذا وجد (مثل: Name on Twitter)
+                    author = getattr(entry, 'author', 'حساب تويتر')
+                    
+                    message = f"🚨 <b>تغريدة جديدة</b>\n👤 <b>الحساب:</b> {author}\n\n💬 {clean_text}\n\n🔗 <a href='{entry.link}'>رابط التغريدة الأصلي</a>"
+                    
+                    if img_url:
+                        send_telegram_media(message, img_url, entry.link)
+                    else:
+                        send_telegram_text(message)
+                        
                     new_seen.add(entry.id)
         except Exception as e:
             print(f"Error parsing {feed_url}: {e}")
