@@ -1,15 +1,21 @@
 import os
 import requests
-from bs4 import BeautifulSoup
-
-ACCOUNTS = [
-    "Drb7h1", "__eventsMT", "SHoNGxBoNgYT", 
-    "AboKharba", "iiMonkey_D", "S5B_Q"
-]
+import feedparser
 
 TELEGRAM_TOKEN = "8947309767:AAEIIbEOKRt9COi2x7rdkNKhewmymZrKPaI"
 CHAT_ID = "8925137681"
 SEEN_FILE = "seen_tweets.txt"
+
+RSS_FEEDS = [
+    "https://rss.app/feeds/3oU5OjGYQb4ZoNSb.xml",
+    "https://rss.app/feeds/bu0XxAFEoGwwP7aS.xml",
+    "https://rss.app/feeds/5ogaHtHdW8LCyzoR.xml",
+    "https://rss.app/feeds/1Z2sBzwxDUVd0kdX.xml",
+    "https://rss.app/feeds/68mfHkIfwEv5LeJT.xml",
+    "https://rss.app/feeds/0WxElD3bKSrbqXaS.xml",
+    "https://rss.app/feeds/WdN4B5y3jEH8H5el.xml",
+    "https://rss.app/feeds/ejIPq5QEbz8QE3Is.xml"
+]
 
 def load_seen():
     if not os.path.exists(SEEN_FILE):
@@ -21,61 +27,29 @@ def load_seen():
         return set()
 
 def save_seen(seen):
-    try:
-        with open(SEEN_FILE, "w") as f:
-            for tweet_id in seen:
-                f.write(f"{tweet_id}\n")
-    except Exception as e:
-        print(f"Error saving seen file: {e}")
+    with open(SEEN_FILE, "w") as f:
+        for tweet_id in seen:
+            f.write(f"{tweet_id}\n")
 
 def send_telegram(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "HTML"}
-    try:
-        requests.post(url, json=payload, timeout=5)
-    except Exception as e:
-        print(f"Error: {e}")
+    requests.post(url, json=payload, timeout=10)
 
 def check_tweets():
     seen = load_seen()
     new_seen = set(seen)
     
-    for account in ACCOUNTS:
-        url = f"https://nitter.privacydev.net/{account}/rss"
-        headers = {"User-Agent": "Mozilla/5.0"}
+    for feed_url in RSS_FEEDS:
         try:
-            # تقليل وقت الانتظار إلى 5 ثواني حتى ما يعلق الـ Workflow أبداً
-            response = requests.get(url, headers=headers, timeout=5)
-            if response.status_code != 200:
-                continue
-                
-            soup = BeautifulSoup(response.text, "xml")
-            items = soup.find_all("item")
-            
-            if not items:
-                continue
-
-            for item in items[:3]:
-                link = item.find("link")
-                title = item.find("title")
-                
-                if not link:
-                    continue
-                
-                tweet_link = link.text
-                tweet_id = tweet_link.split("/")[-1]
-                
-                if tweet_id in seen:
-                    continue
-                
-                tweet_title = title.text if title else "تغريدة جديدة"
-                message = f"🚨 <b>تغريدة جديدة من @{account}</b>\n\n{tweet_title}\n\n🔗 <a href='{tweet_link}'>رابط التغريدة</a>"
-                
-                send_telegram(message)
-                new_seen.add(tweet_id)
-                
+            feed = feedparser.parse(feed_url)
+            for entry in feed.entries[:3]:
+                if entry.id not in seen:
+                    message = f"🚨 <b>تغريدة جديدة!</b>\n\n{entry.title}\n\n🔗 <a href='{entry.link}'>رابط التغريدة</a>"
+                    send_telegram(message)
+                    new_seen.add(entry.id)
         except Exception as e:
-            print(f"Error {account}: {e}")
+            print(f"Error parsing {feed_url}: {e}")
             
     save_seen(new_seen)
 
