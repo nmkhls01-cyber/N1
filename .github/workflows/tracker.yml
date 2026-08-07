@@ -3,7 +3,7 @@ name: Twitter Tracker
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/5 * * * *' # يعمل تلقائياً كل 5 دقائق
+    - cron: '*/5 * * * *'
 
 jobs:
   run-tracker:
@@ -19,8 +19,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install feedparser requests
+          pip install feedparser requests beautifulsoup4
 
       - name: Run script
         run: python tracker.py
