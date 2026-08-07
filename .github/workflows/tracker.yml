@@ -5,6 +5,9 @@ on:
     - cron: '*/5 * * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   run-tracker:
     runs-on: ubuntu-latest
@@ -19,9 +22,15 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install requests beautifulsoup4
+          pip install requests beautifulsoup4 lxml
 
       - name: Run script
         run: |
           python tracker.py
 
+      - name: Commit and push updated seen tweets
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add seen_tweets.txt
+          git diff --quiet && git diff --cached --quiet || (git commit -m "Update seen tweets cache" && git push)
