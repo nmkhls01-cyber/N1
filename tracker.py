@@ -19,12 +19,10 @@ def send_telegram(message):
         print(f"Error: {e}")
 
 def check_tweets():
-    # استخدام نسخة Nitter بديلة ومستقرة
-    nitter_instance = "https://nitter.lucabased.xyz"
-    headers = {"User-Agent": "Mozilla/5.0"}
-
+    # استخدام نسخة بديلة ومستقرة جداً لجلب التغريدات
     for account in ACCOUNTS:
-        url = f"{nitter_instance}/{account}"
+        url = f"https://nitter.poast.org/{account}"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
         try:
             response = requests.get(url, headers=headers, timeout=15)
             if response.status_code != 200:
@@ -36,7 +34,6 @@ def check_tweets():
             if not timeline:
                 continue
 
-            # فحص أحدث تغريدة فقط
             item = timeline[0]
             tweet_link = item.find("a", class_="tweet-link")
             if not tweet_link:
@@ -52,9 +49,8 @@ def check_tweets():
             
             message = f"🚨 <b>تغريدة جديدة من @{account}</b>\n\n{text}\n\n🔗 <a href='{full_tweet_url}'>رابط التغريدة</a>"
             
-            # للإرسال المباشر
             send_telegram(message)
-            break # يرسل أحدث تغريدة ويوقف حتى ما يكرر
+            break
                 
         except Exception as e:
             print(f"Error {account}: {e}")
