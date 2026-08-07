@@ -1,12 +1,9 @@
 name: Twitter Tracker
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'
   workflow_dispatch:
-
-permissions:
-  contents: write
+  schedule:
+    - cron: '*/5 * * * *' # يعمل تلقائياً كل 5 دقائق
 
 jobs:
   run-tracker:
@@ -22,15 +19,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install requests beautifulsoup4 lxml
+          pip install --upgrade pip
+          pip install feedparser requests
 
       - name: Run script
-        run: |
-          python tracker.py
+        run: python tracker.py
 
       - name: Commit and push updated seen tweets
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add seen_tweets.txt
-          git diff --quiet && git diff --cached --quiet || (git commit -m "Update seen tweets cache" && git push)
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Update seen tweets automatically"
+          file_pattern: seen_tweets.txt
